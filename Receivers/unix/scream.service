@@ -1,0 +1,15 @@
+[Unit]
+Description=Scream receiver
+After=network.target sound.target
+
+[Service]
+User=root
+Type=simple
+ExecStart=/root/ScreamReceiverALSA/bin/scream -u -i 192.168.1.2 -p 4011 -o alsa -d "hw:2,0" -t 100 -v
+
+# allow to use real-time priority 40
+LimitRTPRIO=40
+LimitRTTIME=infinity
+
+[Install]
+WantedBy=multi-user.target

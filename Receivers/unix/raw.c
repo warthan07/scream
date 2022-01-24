@@ -1,5 +1,7 @@
 #include "raw.h"
 
+extern int verbosity;
+
 static struct raw_output_data {
   receiver_format_t receiver_format;
   int rate;

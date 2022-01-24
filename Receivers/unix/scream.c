@@ -37,6 +37,7 @@
 #include "jack.h"
 #endif
 
+int verbosity = 0;
 
 static void show_usage(const char *arg0)
 {
@@ -62,8 +63,11 @@ static void show_usage(const char *arg0)
   fprintf(stderr, "         -s <sink name>            : Pulseaudio sink name.\n");
   fprintf(stderr, "         -n <stream name>          : Pulseaudio stream name/description.\n");
   fprintf(stderr, "         -n <client name>          : JACK client name.\n");
-  fprintf(stderr, "         -t <latency>              : Target latency in milliseconds. Defaults to 50ms.\n");
+  fprintf(stderr, "         -l <latency>              : Target latency in milliseconds. Defaults to 50ms.\n");
   fprintf(stderr, "                                     Only relevant for PulseAudio and ALSA output.\n");
+  fprintf(stderr, "         -t <timeout>              : Timeout in ms for automatically closing the ALSA\n");
+  fprintf(stderr, "                                     connection. Default to -1 (ALSA connection always open).\n");
+  fprintf(stderr, "                                     Ignored for other output than ALSA.\n");
   fprintf(stderr, "\n");
   fprintf(stderr, "         -v                        : Be verbose.\n");
   fprintf(stderr, "\n");
@@ -141,10 +145,11 @@ int main(int argc, char*argv[]) {
   char *pa_stream_name       = "Audio";
   char *jack_client_name     = "scream";
   int target_latency_ms      = 50;
+  long timeout_ms             = -1;
   in_addr_t interface        = INADDR_ANY;
   uint16_t port              = DEFAULT_PORT;
   int opt;
-  while ((opt = getopt(argc, argv, "i:g:p:m:x:o:d:s:n:t:Puvh")) != -1) {
+  while ((opt = getopt(argc, argv, "i:g:p:m:x:o:d:s:n:l:t:Puvh")) != -1) {
     switch (opt) {
     case 'i':
       interface_name = strdup(optarg);
@@ -183,9 +188,13 @@ int main(int argc, char*argv[]) {
       pa_stream_name = strdup(optarg);
       jack_client_name = pa_stream_name;
       break;
-    case 't':
+    case 'l':
       target_latency_ms = atoi(optarg);
       if (target_latency_ms < 0) show_usage(argv[0]);
+      break;
+    case 't':
+      timeout_ms = atol(optarg);
+      if (timeout_ms < 0) timeout_ms = -1;
       break;
     case 'v':
       verbosity += 1;
@@ -193,6 +202,10 @@ int main(int argc, char*argv[]) {
     default:
       show_usage(argv[0]);
     }
+  }
+  if (output_mode!=Alsa) {
+    // No need for a timeout for other output than ALSA
+    timeout_ms = -1;
   }
 
   if (interface_name && receiver_mode != Pcap) {
@@ -275,12 +288,14 @@ int main(int argc, char*argv[]) {
     case Multicast:
     default:
       if (verbosity) fprintf(stderr, "Starting %s receiver\n", receiver_mode == Unicast ? "unicast" : "multicast");
-      init_network(receiver_mode, interface, port, multicast_group);
+      init_network(receiver_mode, interface, port, multicast_group, timeout_ms);
+
       receiver_rcv_fn = rcv_network;
       break;
   }
 
-
+  if (verbosity) fprintf(stderr, "Starting capturing data\n");
+  receiver_data.timed_out = 0;
   for (;;) {
     receiver_rcv_fn(&receiver_data);
     if (output_send_fn(&receiver_data) != 0)

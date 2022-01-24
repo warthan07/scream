@@ -12,6 +12,8 @@
 
 #include "jack.h"
 
+extern int verbosity;
+
 // from the Bit Twiddling hacks
 static inline jack_nframes_t round_nframes_to_power_of_two(jack_nframes_t x)
 {

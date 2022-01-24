@@ -1,5 +1,8 @@
 #include "pulseaudio.h"
 
+
+extern int verbosity;
+
 static struct pulse_output_data {
   pa_simple *s;
   pa_sample_spec ss;
